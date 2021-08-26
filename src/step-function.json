@@ -1,0 +1,235 @@
+{
+  "StartAt": "Start - Notify Slack",
+  "States": {
+    "Start - Notify Slack": {
+      "Type": "Task",
+      "Resource": "${cig-sagemaker-slack-lambda-arn}",
+      "InputPath": "$.inputs.slack_message_start_gdpr_job",
+      "ResultPath": "$.results.slack_message_start_gdpr_job",
+      "Next": "Start Glue crawler"
+    },
+    "Start Glue crawler": {
+      "Type": "Task",
+      "Resource": "${cig-start-glue-crawler-lambda-arn}",
+      "InputPath": "$.inputs.start_glue_crawler",
+      "ResultPath": "$.results.start_glue_crawler",
+      "Next": "Wait for glue crawler to finish"
+    },
+    "Wait for glue crawler to finish": {
+      "Type": "Wait",
+      "Seconds": 300,
+      "Next": "Check glue crawler status"
+    },
+    "Check glue crawler status": {
+      "Type": "Task",
+      "Resource": "${cig-get-glue-crawler-status-lambda-arn}",
+      "InputPath": "$.inputs.start_glue_crawler",
+      "ResultPath": "$.results.check_glue_crawler_status",
+      "Next": "Is glue crawler done ?"
+    },
+    "Is glue crawler done ?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            {
+              "Variable": "$.results.check_glue_crawler_status.State",
+              "StringEquals": "READY"
+            },
+            {
+              "Variable": "$.results.check_glue_crawler_status.Success",
+              "BooleanEquals": true
+            }
+          ],
+          "Next": "Query Athena for data to be processed"
+        }
+      ],
+      "Default": "Wait for glue crawler to finish"
+    },
+    "Query Athena for data to be processed": {
+      "Type": "Task",
+      "Resource": "${cig-query-data-lake-for-gdpr-requests-lambda-arn}",
+      "InputPath": "$.inputs.query_athena_for_gdpr_process",
+      "ResultPath": "$.results.query_athena_to_be_processed_result",
+      "Next": "Wait for athena query to finish"
+    },
+    "Wait for athena query to finish": {
+      "Type": "Wait",
+      "Seconds": 300,
+      "Next": "Check athena query status"
+    },
+    "Check athena query status": {
+      "Type": "Task",
+      "Resource": "${cig-check-athena-query-status-lambda-arn}",
+      "InputPath": "$.results.query_athena_to_be_processed_result",
+      "ResultPath": "$.results.athena_query_status",
+      "Next": "Is athena division query finished ?"
+    },
+    "Is athena division query finished ?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            {
+              "Variable": "$.results.athena_query_status.AllQueriesFinished",
+              "BooleanEquals": true
+            },
+            {
+              "Variable": "$.results.athena_query_status.Success",
+              "BooleanEquals": true
+            }
+          ],
+          "Next": "Increase DynamoDB tables capacity"
+        },
+        {
+          "Variable": "$.results.athena_query_status.Success",
+          "BooleanEquals": false,
+          "Next": "GDPR job has failed - Notify Slack"
+        }
+      ],
+      "Default": "Wait for athena query to finish"
+    },
+    "Increase DynamoDB tables capacity": {
+      "Type": "Task",
+      "Resource": "${cig-update-dynamodb-capacity-lambda-arn}",
+      "InputPath": "$.inputs.increase_dynamodb_tables_capacity",
+      "ResultPath": "$.results.increase_dynamodb_tables_capacity",
+      "Next": "Send to-be-altered files S3 Keys to SQS"
+    },
+    "Send to-be-altered files S3 Keys to SQS": {
+      "Type": "Task",
+      "Resource": "${cig-run-ecs-task-lambda-arn}",
+      "InputPath": "$",
+      "ResultPath": "$.results.send_to_be_altered_files_s3_keys_to_sqs",
+      "Next": "Wait for GDPR requests to be sent to SQS"
+    },
+    "Wait for GDPR requests to be sent to SQS": {
+      "Type": "Wait",
+      "Seconds": 300,
+      "Next": "Check if all requests are sent to SQS"
+    },
+    "Check if all requests are sent to SQS": {
+      "Type": "Task",
+      "Resource": "${cig-check-ecs-task-status-lambda-arn}",
+      "InputPath": "$.results.send_to_be_altered_files_s3_keys_to_sqs",
+      "ResultPath": "$.results.check_if_all_requests_are_sent_to_sqs",
+      "Next": "Is Job Done ?"
+    },
+    "Is Job Done ?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            {
+              "Variable": "$.results.check_if_all_requests_are_sent_to_sqs.Status",
+              "StringEquals": "STOPPED"
+            },
+            {
+              "Variable": "$.results.check_if_all_requests_are_sent_to_sqs.Success",
+              "BooleanEquals": true
+            }
+          ],
+          "Next": "Wait for GDPR requests to be processed"
+        },
+        {
+          "Variable": "$.results.check_if_all_requests_are_sent_to_sqs.Success",
+          "BooleanEquals": false,
+          "Next": "GDPR job has failed - Notify Slack"
+        }
+      ],
+      "Default": "Wait for GDPR requests to be sent to SQS"
+    },
+    "Wait for GDPR requests to be processed": {
+      "Type": "Wait",
+      "Seconds": 300,
+      "Next": "Check if all requests are processed"
+    },
+    "Check if all requests are processed": {
+      "Type": "Task",
+      "Resource": "${cig-get-queue-messages-count-lambda-arn}",
+      "InputPath": "$.inputs.get_normal_queue_messages_count",
+      "ResultPath": "$.results.check_if_all_requests_are_processed",
+      "Next": "Is GDPR queue empty?"
+    },
+    "Is GDPR queue empty?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            {
+              "Variable": "$.results.check_if_all_requests_are_processed.Count",
+              "NumericEquals": 0
+            },
+            {
+              "Variable": "$.results.check_if_all_requests_are_processed.Success",
+              "BooleanEquals": true
+            }
+          ],
+          "Next": "Run GDPR EMR Cluster"
+        },
+        {
+          "Variable": "$.results.check_if_all_requests_are_processed.Success",
+          "BooleanEquals": false,
+          "Next": "GDPR job has failed - Notify Slack"
+        }
+      ],
+      "Default": "Wait for GDPR requests to be processed"
+    },
+    "Run GDPR EMR Cluster": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-run-emr-lambda-arn}",
+      "InputPath": "$.inputs.run_gdpr_emr_cluster",
+      "ResultPath": "$.results.run_gdpr_emr_cluster",
+      "Next": "Wait for EMR to complete"
+    },
+    "Wait for EMR to complete": {
+      "Type": "Wait",
+      "Seconds": 1320,
+      "Next": "Get status of EMR cluster"
+    },
+    "Get status of EMR cluster": {
+      "Type": "Task",
+      "Resource": "${dsci-sagemaker-emr-get-status-lambda-arn}",
+      "InputPath": "$.results.run_gdpr_emr_cluster",
+      "ResultPath": "$.results.gdpr_emr_cluster_status",
+      "Next": "Is EMR completed?"
+    },
+    "Is EMR completed?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.results.gdpr_emr_cluster_status.status",
+          "StringEquals": "TERMINATED",
+          "Next": "No more data to anonymize - Notify Slack"
+        },
+        {
+          "Variable": "$.results.gdpr_emr_cluster_status.status",
+          "StringEquals": "TERMINATED_WITH_ERRORS",
+          "Next": "GDPR job has failed - Notify Slack"
+        }
+      ],
+      "Default": "Wait for EMR to complete"
+    },
+    "No more data to anonymize - Notify Slack": {
+      "Type": "Task",
+      "Resource": "${cig-sagemaker-slack-lambda-arn}",
+      "InputPath": "$.inputs.slack_message_no_data_to_anonymize",
+      "ResultPath": "$.inputs.slack_message_no_data_to_anonymize",
+      "Next": "Decrease DynamoDB tables capacity"
+    },
+    "GDPR job has failed - Notify Slack": {
+      "Type": "Task",
+      "Resource": "${cig-sagemaker-slack-lambda-arn}",
+      "InputPath": "$.inputs.slack_message_job_failed",
+      "ResultPath": "$.inputs.slack_message_job_failed",
+      "Next": "Decrease DynamoDB tables capacity"
+    },
+    "Decrease DynamoDB tables capacity": {
+      "Type": "Task",
+      "Resource": "${cig-update-dynamodb-capacity-lambda-arn}",
+      "InputPath": "$.inputs.decrease_dynamodb_tables_capacity",
+      "ResultPath": "$.results.decrease_dynamodb_tables_capacity",
+      "End": true
+    }
+  }
+}

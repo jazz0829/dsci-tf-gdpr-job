@@ -1,0 +1,373 @@
+{
+  "inputs": {
+    "slack_message_start_gdpr_job": {
+      "message": "Started GDPR Job."
+    },
+    "start_glue_crawler": {
+      "CrawlerName": "${eol_data_crawler_name}"
+    },
+    "slack_message_no_data_to_anonymize": {
+      "message": "GDPR job has been successfully completed."
+    },
+    "slack_message_job_failed": {
+      "message": "GDPR Job has failed ! Please check the GDPR step function"
+    },
+    "slack_message_athena_failed": {
+      "message": "Athena query in the GDPR Job has failed ! Please check the GDPR step function output logs"
+    },
+    "get_normal_queue_messages_count": {
+      "QueueName": "${sqs_queue_name}"
+    },
+    "get_emr_queue_messages_count": {
+      "QueueName": "${emr_sqs_queue_name}"
+    },
+    "run_gdpr_emr_cluster": {
+      "params": {
+        "Name": "GDPR_Cluster",
+        "LogUri": "${emr_log_output}",
+        "ReleaseLabel": "emr-5.21.0",
+        "Applications": [
+          {
+            "Name": "Hadoop"
+          },
+          {
+            "Name": "Livy"
+          },
+          {
+            "Name": "Spark"
+          }
+        ],
+        "Instances": {
+          "InstanceGroups": [
+            {
+              "Name": "Master nodes",
+              "Market": "ON_DEMAND",
+              "InstanceRole": "MASTER",
+              "InstanceType": "${emr_master_node_instance_type}",
+              "InstanceCount":${emr_master_node_instance_count
+              },
+              "EbsConfiguration": {
+                "EbsBlockDeviceConfigs": [
+                  {
+                    "VolumeSpecification": {
+                      "SizeInGB": 32,
+                      "VolumeType": "gp2"
+                    },
+                    "VolumesPerInstance": 1
+                  }
+                ],
+                "EbsOptimized": true
+              }
+            },
+            {
+              "Name": "Slave nodes",
+              "Market": "ON_DEMAND",
+              "InstanceRole": "CORE",
+              "InstanceType": "${emr_core_node_instance_type}",
+              "InstanceCount":${emr_core_node_instance_count
+              },
+              "EbsConfiguration": {
+                "EbsBlockDeviceConfigs": [
+                  {
+                    "VolumeSpecification": {
+                      "SizeInGB": 32,
+                      "VolumeType": "gp2"
+                    },
+                    "VolumesPerInstance": 1
+                  }
+                ],
+                "EbsOptimized": true
+              }
+            }
+          ],
+          "Ec2SubnetId": "${emr_subnet_id}",
+          "KeepJobFlowAliveWhenNoSteps": false,
+          "TerminationProtected": false
+        },
+        "Steps": [
+          {
+            "Name": "Process GDPR Requests",
+            "ActionOnFailure": "TERMINATE_CLUSTER",
+            "HadoopJarStep": {
+              "Jar": "command-runner.jar",
+              "Args": [
+                "spark-submit",
+                "--deploy-mode",
+                "cluster",
+                "${process_gdpr_requests_script}",
+                "-q",
+                "${emr_sqs_queue_name}",
+                "-t",
+                "${cig_gdpr_log_dynamodb_table_name}"
+              ]
+            }
+          }
+        ],
+        "BootstrapActions": [
+          {
+            "Name": "Install dependency",
+            "ScriptBootstrapAction": {
+              "Path": "${emr_install_dependencies_script}"
+            }
+          }
+        ],
+        "ScaleDownBehavior": "TERMINATE_AT_TASK_COMPLETION",
+        "VisibleToAllUsers": true,
+        "JobFlowRole": "EMR_EC2_DefaultRole",
+        "ServiceRole": "EMR_DefaultRole",
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "Data-lake-GDPR"
+          }
+        ]
+      }
+    },
+    "query_athena_for_gdpr_process": {
+      "queries": [
+        {
+          "QuerySettings": {
+            "QueryString": "",
+            "QueryExecutionContext": {
+              "Database": "${eol-database-name}"
+            },
+            "ResultConfiguration": {
+              "OutputLocation": "${athena_query_output_location}"
+            }
+          },
+          "Action": "Delete",
+          "KeepLatest": false,
+          "Tables": [
+            {
+              "Name": "gltransactionsmaster",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "gltransactions_v2",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "gltransactions",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "divisions",
+              "KeyColumn": "Code",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "bankaccounts",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "accounts",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "settings",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "allocatematchinfo",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "documents",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "glaccounts",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "glaccountsuggestions",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "glaccounttaxonomymappings",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "journals",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "proposedentries",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "proposedentrylines",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "taxonomyelements",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "taxonomynamespaces",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            },
+            {
+              "Name": "FinancialPeriods",
+              "KeyColumn": "Division",
+              "SubQuery": "sub_query_division"
+            }
+          ]
+        },
+        {
+          "QuerySettings": {
+            "QueryString": "",
+            "QueryExecutionContext": {
+              "Database": "${cig-database-name}"
+            },
+            "ResultConfiguration": {
+              "OutputLocation": "${athena_query_output_location}"
+            }
+          },
+          "Action": "Delete",
+          "KeepLatest": true,
+          "Tables": [
+            {
+              "Name": "object_host_cig_persons",
+              "KeyColumn": "id",
+              "DateColumn": "cigcopytime",
+              "SubQuery": "sub_query_person"
+            },
+            {
+              "Name": "object_host_cig_users",
+              "KeyColumn": "person",
+              "DateColumn": "cigcopytime",
+              "SubQuery": "sub_query_person"
+            },
+            {
+              "Name": "object_user",
+              "KeyColumn": "userid__c",
+              "DateColumn": "etlinserttime",
+              "SubQuery": "sub_query_user"
+            },
+            {
+              "Name": "object_contact",
+              "KeyColumn": "userid__c",
+              "DateColumn": "etlinserttime",
+              "SubQuery": "sub_query_user"
+            },
+            {
+              "Name": "object_host_cig_accounts",
+              "KeyColumn": "id",
+              "DateColumn": "cigcopytime",
+              "SubQuery": "sub_query_account"
+            },
+            {
+              "Name": "object_host_cig_requests",
+              "KeyColumn": "account",
+              "DateColumn": "cigcopytime",
+              "SubQuery": "sub_query_account"
+            },
+            {
+              "Name": "object_account",
+              "KeyColumn": "exact_id__c",
+              "DateColumn": "etlinserttime",
+              "SubQuery": "sub_query_account"
+            }
+          ]
+        },
+        {
+          "QuerySettings": {
+            "QueryString": "",
+            "QueryExecutionContext": {
+              "Database": "${cig-database-name}"
+            },
+            "ResultConfiguration": {
+              "OutputLocation": "${athena_query_cig_output_location}"
+            }
+          },
+          "Action": "Anonymize",
+          "Tables": [
+            {
+              "Name": "object_host_cig_divisions",
+              "KeyColumn": "customer",
+              "AnonymizeColumns": [
+                "description",
+                "chamberofcommerce",
+                "city",
+                "postcode",
+                "dunsnumber",
+                "website"
+              ],
+              "SubQuery": "sub_query_account"
+            }
+          ]
+        }
+      ]
+    },
+    "increase_dynamodb_tables_capacity": {
+      "tables": [
+        {
+          "TableName": "${cig_gdpr_log_dynamodb_table_name}",
+          "WriteCapacityUnits": "${high_write_capacity_units}",
+          "ReadCapacityUnits": "${high_read_capacity_units}"
+        }
+      ]
+    },
+    "decrease_dynamodb_tables_capacity": {
+      "tables": [
+        {
+          "TableName": "${cig_gdpr_log_dynamodb_table_name}",
+          "WriteCapacityUnits": "${low_write_capacity_units}",
+          "ReadCapacityUnits": "${low_read_capacity_units}"
+        }
+      ]
+    },
+    "send_to_be_altered_files_s3_keys_to_sqs": {
+      "cluster": "${fargate-cluster-arn}",
+      "taskDefinition": "${task-definition-arn}",
+      "launchType": "FARGATE",
+      "platformVersion": "LATEST",
+      "networkConfiguration": {
+        "awsvpcConfiguration": {
+          "subnets": [
+            "${ecs_subnet_id}"
+          ],
+          "assignPublicIp": "ENABLED"
+        }
+      },
+      "overrides": {
+        "containerOverrides": [
+          {
+            "name": "gdpr",
+            "environment": [
+              {
+                "name": "FILE_PATHS",
+                "value": ""
+              },
+              {
+                "name": "LAMBDA_SQS_QUEUE_NAME",
+                "value": "${sqs_queue_name}"
+              },
+              {
+                "name": "EMR_SQS_QUEUE_NAME",
+                "value": "${emr_sqs_queue_name}"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+locals {
+  name_prefix                            = "cig"
+  cig_gdpr_step_function_name            = "${local.name_prefix}-gdpr-job-step-function"
+  cig_gdpr_state_machine_role_name       = "${local.cig_gdpr_step_function_name}-iam-role"
+  cig_gdpr_state_machine_policy_name     = "${local.cig_gdpr_state_machine_role_name}-invoke-policy"
+  cig_start_gdpr_job_event_rule_name     = "${local.name_prefix}-cw-rule-gdpr-job"
+  cig_gdpr_requests_queue_name           = "${local.name_prefix}-gdpr-requests-queue"
+  cig_gdpr_requests_emr_queue_name       = "${local.name_prefix}-gdpr-requests-emr-queue"
+  cig_gdpr_log_dynamodb_table_name       = "${local.name_prefix}-gdpr-log"
+  cig_gdpr_table_auto_scaling_role_name  = "${local.name_prefix}-gdpr-table-auto-scaling-role"
+  cig_ecs_cluster_name                   = "${local.name_prefix}-gdpr-cluster"
+  cig_run_ecs_task_role_name             = "${local.name_prefix}-run-gdpr-ecs-task"
+  cig_run_ecs_task_policy_name           = "${local.cig_run_ecs_task_role_name}-invoke-policy"
+  cig_gdpr_bucket_name                   = "${local.name_prefix}-gdpr-${var.accountid}-${var.region}"
+}

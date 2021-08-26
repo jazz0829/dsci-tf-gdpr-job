@@ -1,0 +1,17 @@
+locals {
+  lambda_app_bookmark_sagemaker_endpoint_config = "${var.name_prefix}-dsci-sagemaker-bookmark-endpoint-config"
+  lambda_app_create_cloudwatch_alarm_sagemaker  = "${var.name_prefix}-dsci-sagemaker-create-cloudwatch-alarms"
+  lambda_app_create_sagemaker_endpoint_config   = "${var.name_prefix}-dsci-sagemaker-create-endpoint-config"
+  lambda_app_create_sagemaker_training_job      = "${var.name_prefix}-dsci-sagemaker-create-training-job"
+  lambda_app_get_sagemaker_endpoint_status      = "${var.name_prefix}-dsci-sagemaker-get-endpoint-status"
+  lambda_app_invoke_sagemaker_endpoint          = "${var.name_prefix}-dsci-sagemaker-invoke-endpoint"
+  lambda_app_rollback_sagemaker_endpoint        = "${var.name_prefix}-dsci-sagemaker-rollback-endpoint"
+  lambda_app_update_sagemaker_endpoint          = "${var.name_prefix}-dsci-sagemaker-update-endpoint"
+  lambda_app_create_sagemaker_model             = "${var.name_prefix}-dsci-sagemaker-create-model"
+  lambda_app_run_emr_job                        = "${var.name_prefix}-dsci-sagemaker-run-emr-job"
+  lambda_app_get_emr_cluster_status             = "${var.name_prefix}-dsci-sagemaker-get-emr-cluster-status"
+  lambda_app_notify_slack                       = "${var.name_prefix}-dsci-sagemaker-notify-slack"
+  lambda_app_sagemaker_training_status          = "${var.name_prefix}-dsci-sagemaker-get-training-job-status"
+  lambda_app_sagemaker_apply_auto_scaling       = "${var.name_prefix}-dsci-sagemaker-apply-auto-scaling"
+  lambda_update_dynamodb_capacity               = "${var.name_prefix}-dsci-update-dynamodb-capacity"
+}
